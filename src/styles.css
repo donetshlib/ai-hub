@@ -1,0 +1,591 @@
+:root {
+  --bg: #1e1e1e;
+  --sidebar: #171717;
+  --surface: #2a2a2a;
+  --surface-hover: #333;
+  --panel: #202020;
+  --panel-head: #262626;
+  --input-bg: #171717;
+  --border: #383838;
+  --text: #eaeaea;
+  --text-dim: #8f8f8f;
+  --accent: #22c55e;
+  --accent-text: #08240f;
+  --danger: #ef4444;
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+/* "Оригинальная" — палитра иконки приложения: неон-зелёный по тёмно-синему. */
+html[data-theme="original"] {
+  --bg: #10162a;
+  --sidebar: #0a0f20;
+  --surface: #1b2340;
+  --surface-hover: #253057;
+  --panel: #141b33;
+  --panel-head: #1a2240;
+  --input-bg: #0d1326;
+  --border: #2b3763;
+  --text: #e8fff5;
+  --text-dim: #7e90bd;
+  --accent: #5df2a0;
+  --accent-text: #06231a;
+  --danger: #ff6b6b;
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+}
+
+html[data-theme="light"] {
+  --bg: #f0f0f0;
+  --sidebar: #e6e6e6;
+  --surface: #fff;
+  --surface-hover: #e0e0e0;
+  --panel: #fbfbfb;
+  --panel-head: #f2f2f2;
+  --input-bg: #fff;
+  --border: #dcdcdc;
+  --text: #1c1c1c;
+  --text-dim: #6b6b6b;
+  --accent: #16a34a;
+  --accent-text: #fff;
+  --danger: #dc2626;
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+}
+
+/* ---------- Сайдбар ---------- */
+
+#sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 56px;
+  background: var(--sidebar);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  z-index: 10;
+}
+
+#tab-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  scrollbar-width: thin;
+}
+
+/* Скроллбары под тему приложения */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+#tab-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tab-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: visible;
+  opacity: 0.65;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.tab-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.tab-icon.active {
+  border-color: var(--accent);
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* Полоска слева у активной вкладки: рамку на пёстрых фавиконах видно плохо. */
+.tab-icon.active::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 4px;
+  height: 24px;
+  transform: translateY(-50%);
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+.tab-icon.pinned::after {
+  content: "📌";
+  position: absolute;
+  font-size: 10px;
+  bottom: -2px;
+  right: -2px;
+}
+
+.tab-icon:hover {
+  background: var(--surface-hover);
+  transform: scale(1.06);
+  opacity: 1;
+}
+
+#add-tab-btn,
+#settings-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 8px;
+  font-size: 20px;
+}
+
+#add-tab-btn:hover,
+#settings-btn:hover {
+  background: var(--surface-hover);
+}
+
+/* ---------- Боковая панель ---------- */
+
+/* В окне панели сайдбара нет, панель занимает окно целиком. */
+.panel-mode #sidebar {
+  display: none;
+}
+
+.panel-mode #panel {
+  left: 0;
+  width: 100%;
+  box-shadow: none;
+}
+
+#panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 56px;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
+  z-index: 5;
+  animation: slide 0.16s ease-out;
+}
+
+@keyframes slide {
+  from { transform: translateX(-12px); opacity: 0; }
+}
+
+#panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--panel-head);
+  border-bottom: 1px solid var(--border);
+}
+
+#panel h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+#close-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#close-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+#panel-body {
+  padding: 2px 16px 18px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.caption {
+  margin: 18px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* Список вкладок: 4 строки, дальше скролл */
+#tab-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 176px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tab-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--input-bg);
+  font-size: 14px;
+}
+
+.tab-row:hover {
+  border-color: var(--border);
+}
+
+.tab-row.current {
+  border-color: var(--accent);
+}
+
+.tab-row img {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+}
+
+.tab-row span {
+  flex: 1;
+}
+
+.tab-row .pin {
+  flex: 0;
+  font-size: 11px;
+}
+
+.tab-row .del {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.tab-row .del:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.url-row {
+  display: flex;
+  gap: 6px;
+}
+
+.url-row input {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-dim);
+}
+
+.url-row button {
+  width: 38px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.url-row button:hover {
+  background: var(--surface-hover);
+}
+
+input {
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.field span {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Тумблер */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.switch {
+  appearance: none;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.switch:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+/* Сегментированный переключатель */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--input-bg);
+}
+
+.segmented button {
+  flex: 1;
+  min-width: 64px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.segmented button:hover {
+  color: var(--text);
+}
+
+.segmented button.on {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.custom-row span {
+  flex: 1;
+}
+
+.custom-row input {
+  width: 76px;
+}
+
+#lang {
+  width: 100%;
+}
+
+select {
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Пресеты */
+#presets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.preset img {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.preset:hover {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.actions button {
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.actions .ghost {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.actions .ghost:hover {
+  background: var(--surface-hover);
+}
+
+.actions .primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.actions .primary:hover {
+  filter: brightness(1.08);
+}

@@ -1,0 +1,46 @@
+# Maintainer: AI Hub
+#
+# Установка: распакуй архив проекта, затем
+#   cd packaging && makepkg -si
+# makepkg сам доставит недостающие зависимости через pacman.
+#
+# npm/Node тут не нужны: фронтенд это готовые статические файлы в src/,
+# бинарь собирается обычным cargo.
+pkgname=ai-hub
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Мульти-SSB с сайдбаром для ИИ-чатов (Claude, ChatGPT, Gemini, Grok, DeepSeek)"
+arch=('x86_64')
+url="https://github.com/local/ai-hub"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3')
+makedepends=('rust' 'pkgconf')
+options=('!lto')
+
+prepare() {
+  # Собираем из дерева рядом с PKGBUILD, без промежуточного архива.
+  rm -rf "$srcdir/$pkgname"
+  mkdir -p "$srcdir/$pkgname"
+  # packaging сюда не копируем: $srcdir лежит внутри него, вышла бы рекурсия.
+  cp -r "$startdir/../src" "$startdir/../src-tauri" "$srcdir/$pkgname/"
+  rm -rf "$srcdir/$pkgname/src-tauri/target"
+}
+
+build() {
+  cd "$srcdir/$pkgname/src-tauri"
+  cargo build --release --locked
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+
+  install -Dm755 "src-tauri/target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+  install -Dm644 "$startdir/$pkgname.desktop" "$pkgdir/usr/share/applications/$pkgname.desktop"
+
+  install -Dm644 "src-tauri/icons/32x32.png" \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
+  install -Dm644 "src-tauri/icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
+  install -Dm644 "src-tauri/icons/icon.png" \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+}

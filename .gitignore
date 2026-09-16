@@ -1,0 +1,27 @@
+# Секреты и локальное окружение
+.env
+
+# Зависимости и артефакты сборки
+node_modules/
+target/
+dist/
+*.tar.gz
+*.pkg.tar.zst
+packaging/src/
+packaging/pkg/
+
+# Инструменты разработки, не нужные для сборки
+.claude/
+.deepseek-agent/
+.devcontainer/
+scripts/
+CLAUDE.md
+TZ-*.md
+.aider*
+.env.example
+
+# Прочее
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

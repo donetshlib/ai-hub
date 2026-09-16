@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AI Hub
+Comment=Sidebar for AI chats: Claude, ChatGPT, Gemini, Grok, DeepSeek
+Exec=ai-hub
+Icon=ai-hub
+Terminal=false
+Categories=Network;Utility;
+StartupWMClass=AI Hub

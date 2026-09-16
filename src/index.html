@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Hub</title>
+    <script type="module" src="/main.js" defer></script>
+  </head>
+
+  <body>
+    <nav id="sidebar">
+      <div id="tab-list"></div>
+      <button id="add-tab-btn" data-i18n-title="addTabTip">+</button>
+      <button id="settings-btn" data-i18n-title="settings">⚙</button>
+    </nav>
+
+    <aside id="panel" hidden>
+      <header>
+        <h1 id="panel-title"></h1>
+        <button type="button" id="close-btn" data-i18n-title="close">✕</button>
+      </header>
+
+      <div id="panel-body">
+        <!-- Настройки -->
+        <div id="view-settings" hidden>
+          <p class="caption" data-i18n="tabs"></p>
+          <div id="tab-rows"></div>
+
+          <p class="caption" data-i18n="currentPage"></p>
+          <div class="url-row">
+            <input id="current-url" readonly data-i18n-placeholder="noTab" />
+            <button type="button" id="copy-url" data-i18n-title="copy">🔗</button>
+            <button type="button" id="reset-url" data-i18n-title="resetPage">⟳</button>
+          </div>
+
+          <p class="caption" data-i18n="session"></p>
+          <label class="switch-row">
+            <span data-i18n="restoreOnStart"></span>
+            <input type="checkbox" id="restore-session" class="switch" />
+          </label>
+
+          <p class="caption" data-i18n="language"></p>
+          <select id="lang"></select>
+
+          <p class="caption" data-i18n="theme"></p>
+          <div class="segmented" id="theme-seg">
+            <button type="button" data-value="dark" data-i18n="dark"></button>
+            <button type="button" data-value="light" data-i18n="light"></button>
+            <button type="button" data-value="original" data-i18n="original"></button>
+          </div>
+
+          <p class="caption" data-i18n="unload"></p>
+          <div class="segmented" id="timeout-seg">
+            <button type="button" data-value="30">30 <span data-i18n="sec"></span></button>
+            <button type="button" data-value="300">5 <span data-i18n="min"></span></button>
+            <button type="button" data-value="900">15 <span data-i18n="min"></span></button>
+            <button type="button" data-value="1800">30 <span data-i18n="min"></span></button>
+            <button type="button" data-value="never" data-i18n="never"></button>
+          </div>
+          <div class="custom-row">
+            <span data-i18n="custom"></span>
+            <input type="number" id="custom-value" min="1" placeholder="—" />
+            <select id="custom-unit">
+              <option value="1" data-i18n="sec"></option>
+              <option value="60" data-i18n="min"></option>
+            </select>
+          </div>
+          <p class="hint" data-i18n="pinHint"></p>
+        </div>
+
+        <!-- Добавление вкладки -->
+        <form id="view-add" hidden>
+          <p class="caption" data-i18n="presets"></p>
+          <div id="presets"></div>
+
+          <p class="caption" data-i18n="ownService"></p>
+          <label class="field">
+            <span data-i18n="name"></span>
+            <input id="tab-name" required placeholder="MyService" />
+          </label>
+          <label class="field">
+            <span data-i18n="url"></span>
+            <input id="tab-url" type="url" required placeholder="https://example.com" />
+          </label>
+          <div class="actions">
+            <button type="button" class="ghost" id="cancel-add" data-i18n="cancel"></button>
+            <button type="submit" class="primary" data-i18n="add"></button>
+          </div>
+        </form>
+      </div>
+    </aside>
+  </body>
+</html>
