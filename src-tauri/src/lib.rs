@@ -195,12 +195,12 @@ fn open_panel(app: tauri::AppHandle, webview: tauri::Webview, kind: String) -> R
 /// Sidebar context menu. Also a separate owner window, and for the same reason as the
 /// settings panel: HTML of the main window would end up under the tab webviews.
 #[tauri::command(async)]
-fn open_menu(app: tauri::AppHandle, webview: tauri::Webview, id: String, x: f64, y: f64) -> Result<(), String> {
+fn open_menu(app: tauri::AppHandle, #[allow(unused_variables)] webview: tauri::Webview, id: String, x: f64, y: f64) -> Result<(), String> {
     if let Some(menu) = app.get_webview_window(MENU_LABEL) {
         menu.close().ok();
     }
+    #[cfg(windows)]
     let parent = webview.window();
-    let scale = parent.scale_factor().unwrap_or(1.0);
 
     #[allow(unused_mut)]
     let mut builder = tauri::WebviewWindowBuilder::new(
@@ -212,15 +212,18 @@ fn open_menu(app: tauri::AppHandle, webview: tauri::Webview, id: String, x: f64,
     .skip_taskbar(true)
     .resizable(false)
     .always_on_top(true)
-    .inner_size(230.0, 150.0)
-    .position(x / scale, y / scale);
+    // screenX/screenY from the webview are already logical pixels, so no scaling here.
+    .inner_size(240.0, 168.0)
+    .position(x, y);
 
     #[cfg(windows)]
     if let Ok(hwnd) = parent.hwnd() {
         builder = builder.owner_raw(hwnd);
     }
 
-    builder.build().map_err(|e| e.to_string())?;
+    let menu = builder.build().map_err(|e| e.to_string())?;
+    // Without focus the window would never receive blur, and the menu could not close itself.
+    menu.set_focus().ok();
     Ok(())
 }
 
