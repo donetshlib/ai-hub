@@ -12,6 +12,7 @@ const PANEL_LABEL: &str = "__panel";
 const MENU_LABEL: &str = "__menu";
 /// Settings panel width in logical pixels.
 const PANEL_WIDTH: f64 = 380.0;
+const SESSION_SAVE_INTERVAL: Duration = Duration::from_secs(2);
 const UNLOAD_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +76,8 @@ impl Default for Settings {
 }
 
 struct AppState {
+    /// Throttle for save_session: sync_panes runs on every frame of a divider drag.
+    last_saved: Mutex<Instant>,
     webviews: Mutex<HashMap<String, Webview>>,
     active_tab: Mutex<Option<String>>,
     /// When the tab became inactive (hidden). Drives the unload timeout.
@@ -269,6 +272,13 @@ fn set_webview_theme(webview: tauri::Webview, theme: String) {
 /// Called when leaving a tab and when the window closes.
 fn save_session(app: &tauri::AppHandle, window: &tauri::Window) {
     let state = app.state::<AppState>();
+    {
+        let mut last = state.last_saved.lock().unwrap();
+        if last.elapsed() < SESSION_SAVE_INTERVAL {
+            return;
+        }
+        *last = Instant::now();
+    }
     save_window_state(app, window);
     let Some(id) = state.active_tab.lock().unwrap().clone() else { return };
     let wv = state.webviews.lock().unwrap().get(&id).cloned();
@@ -345,6 +355,10 @@ fn sync_panes(app: tauri::AppHandle, webview: tauri::Webview, panes: Vec<Pane>) 
 
     let mut shown: Vec<String> = Vec::with_capacity(panes.len());
     for pane in &panes {
+        // A zero or negative rectangle would reach the native layer as a bogus size.
+        if pane.width < 1.0 || pane.height < 1.0 {
+            continue;
+        }
         let position = PhysicalPosition::new((pane.x * scale) as i32, (pane.y * scale) as i32);
         let size = PhysicalSize::new((pane.width * scale) as u32, (pane.height * scale) as u32);
 
@@ -497,6 +511,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(AppState {
+            last_saved: Mutex::new(Instant::now()),
             webviews: Mutex::new(HashMap::new()),
             active_tab: Mutex::new(None),
             hidden_since: Mutex::new(HashMap::new()),

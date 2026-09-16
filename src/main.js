@@ -147,14 +147,26 @@ function paneRects() {
   });
 }
 
-async function applyLayout() {
-  const rects = paneRects();
-  renderPaneChrome(rects);
-  try {
-    await invoke("sync_panes", { panes: rects });
-  } catch (err) {
-    console.error("sync_panes failed", err);
-  }
+// A divider drag fires dozens of mousemove events per second; without this the native
+// layer and the settings file would be hammered on every one of them.
+let layoutPending = false;
+
+function applyLayout() {
+  if (layoutPending) return Promise.resolve();
+  layoutPending = true;
+  return new Promise((resolve) => {
+    requestAnimationFrame(async () => {
+      layoutPending = false;
+      const rects = paneRects();
+      renderPaneChrome(rects);
+      try {
+        await invoke("sync_panes", { panes: rects });
+      } catch (err) {
+        console.error("sync_panes failed", err);
+      }
+      resolve();
+    });
+  });
 }
 
 function renderPaneChrome(rects) {
