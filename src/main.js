@@ -30,7 +30,16 @@ const customUnit = document.getElementById("custom-unit");
 const themeSeg = document.getElementById("theme-seg");
 const timeoutSeg = document.getElementById("timeout-seg");
 
+const SIDEBAR_WIDTH = 56;
+const PANE_GAP = 6;
+const PANE_HEADER = 30;
+const MAX_PANES = 10;
+
+const paneChrome = document.getElementById("pane-chrome");
+
 let tabs = [];
+let panes = [];
+let fractions = [];
 let activeId = null;
 let settings = {};
 let openView = null;
@@ -58,21 +67,60 @@ function render() {
     btn.addEventListener("click", () => selectTab(tab));
     btn.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      toggleNeverUnload(tab);
+      invoke("open_menu", { id: tab.id, x: e.screenX, y: e.screenY });
     });
     tabList.appendChild(btn);
   }
 }
 
+function tabUrl(tab, resetToBase = false) {
+  return !resetToBase && settings.restore_session && tab.last_url ? tab.last_url : tab.url;
+}
+
+// A click on the sidebar replaces the first pane; a tab already on screen just takes focus.
 async function selectTab(tab, resetToBase = false) {
+  if (panes.some((pane) => pane.id === tab.id) && !resetToBase) return;
+  const entry = { id: tab.id, url: tabUrl(tab, resetToBase) };
+  if (panes.length === 0) {
+    panes = [entry];
+    fractions = [1];
+  } else {
+    panes[0] = entry;
+  }
   activeId = tab.id;
   render();
-  try {
-    const url = !resetToBase && settings.restore_session && tab.last_url ? tab.last_url : tab.url;
-    await invoke("switch_tab", { id: tab.id, url });
-  } catch (err) {
-    console.error("switch_tab failed", tab.id, err);
+  await applyLayout();
+}
+
+// "Open beside": a new pane on the right, widths split evenly.
+async function openBeside(tab) {
+  if (panes.some((pane) => pane.id === tab.id)) return;
+  if (panes.length >= MAX_PANES) {
+    toast(t("paneLimit"));
+    return;
   }
+  panes.push({ id: tab.id, url: tabUrl(tab) });
+  fractions = panes.map(() => 1 / panes.length);
+  render();
+  await applyLayout();
+}
+
+async function closePane(index) {
+  const [removed] = panes.splice(index, 1);
+  fractions = panes.map(() => 1 / panes.length);
+  await invoke("close_tab", { id: removed.id });
+  activeId = panes[0]?.id ?? null;
+  render();
+  await applyLayout();
+}
+
+// Reordering by arrows rather than drag and drop: the pane headers are a thin strip of the
+// main webview, and a drag across them would pass over the tab webviews, which swallow it.
+async function movePane(index, delta) {
+  const target = index + delta;
+  if (target < 0 || target >= panes.length) return;
+  [panes[index], panes[target]] = [panes[target], panes[index]];
+  await applyLayout();
 }
 
 async function toggleNeverUnload(tab) {
@@ -80,6 +128,113 @@ async function toggleNeverUnload(tab) {
   await invoke("save_tabs", { tabs });
   render();
   await emit("tabs-changed");
+}
+
+/* ---------- Split view ---------- */
+
+// Rectangles are computed here, not in Rust: this side knows the sidebar, the headers
+// and the dividers. Rust only applies them.
+function paneRects() {
+  const header = panes.length > 1 ? PANE_HEADER : 0;
+  const contentW = window.innerWidth - SIDEBAR_WIDTH;
+  const usable = contentW - PANE_GAP * (panes.length - 1);
+  let x = SIDEBAR_WIDTH;
+  return panes.map((pane, i) => {
+    const width = usable * fractions[i];
+    const rect = { ...pane, x, y: header, width, height: window.innerHeight - header };
+    x += width + PANE_GAP;
+    return rect;
+  });
+}
+
+async function applyLayout() {
+  const rects = paneRects();
+  renderPaneChrome(rects);
+  try {
+    await invoke("sync_panes", { panes: rects });
+  } catch (err) {
+    console.error("sync_panes failed", err);
+  }
+}
+
+function renderPaneChrome(rects) {
+  paneChrome.innerHTML = "";
+  if (panes.length < 2) return;
+
+  rects.forEach((rect, i) => {
+    const head = document.createElement("div");
+    head.className = "pane-head";
+    head.style.left = `${rect.x}px`;
+    head.style.width = `${rect.width}px`;
+    head.style.height = `${PANE_HEADER}px`;
+
+    const name = tabs.find((tab) => tab.id === rect.id)?.name ?? rect.id;
+    head.innerHTML = `<span class="pane-name">${name}</span>`;
+
+    for (const [delta, label] of [[-1, "‹"], [1, "›"]]) {
+      const move = document.createElement("button");
+      move.type = "button";
+      move.textContent = label;
+      move.title = t("movePane");
+      move.addEventListener("click", () => movePane(i, delta));
+      head.appendChild(move);
+    }
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "pane-close";
+    close.textContent = "✕";
+    close.title = t("closePane");
+    close.addEventListener("click", () => closePane(i));
+    head.appendChild(close);
+
+    paneChrome.appendChild(head);
+
+    if (i < rects.length - 1) {
+      const divider = document.createElement("div");
+      divider.className = "divider";
+      divider.style.left = `${rect.x + rect.width}px`;
+      divider.style.width = `${PANE_GAP}px`;
+      divider.addEventListener("mousedown", (e) => startDividerDrag(e, i));
+      paneChrome.appendChild(divider);
+    }
+  });
+}
+
+// Dragging a divider moves width between the two neighbouring panes only.
+function startDividerDrag(event, index) {
+  event.preventDefault();
+  const usable = window.innerWidth - SIDEBAR_WIDTH - PANE_GAP * (panes.length - 1);
+  const startX = event.clientX;
+  const left = fractions[index];
+  const right = fractions[index + 1];
+  const minimum = 0.08;
+
+  const onMove = (e) => {
+    const delta = (e.clientX - startX) / usable;
+    const nextLeft = left + delta;
+    const nextRight = right - delta;
+    if (nextLeft < minimum || nextRight < minimum) return;
+    fractions[index] = nextLeft;
+    fractions[index + 1] = nextRight;
+    applyLayout();
+  };
+  const onUp = () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+  };
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
+// The pane headers are the only always-visible strip of the main webview in split mode,
+// so a message can be shown there and nowhere else.
+function toast(text) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
 }
 
 /* ---------- Side panel ---------- */
@@ -148,7 +303,7 @@ async function addTab(tab) {
 async function removeTab(tab) {
   tabs = tabs.filter((t) => t.id !== tab.id);
   await invoke("save_tabs", { tabs });
-  await invoke("remove_tab", { id: tab.id });
+  await invoke("close_tab", { id: tab.id });
   renderTabRows();
   await emit("tabs-changed");
 }
@@ -288,6 +443,30 @@ viewAdd.addEventListener("submit", (e) => {
   viewAdd.reset();
 });
 
+window.addEventListener("resize", applyLayout);
+
+/* ---------- Sidebar context menu (its own window) ---------- */
+
+function renderMenu() {
+  const id = new URLSearchParams(location.search).get("tab");
+  const tab = tabs.find((item) => item.id === id);
+  if (!tab) return;
+
+  const menu = document.getElementById("menu");
+  document.getElementById("menu-pin").textContent = t(tab.never_unload ? "unpin" : "pin");
+  applyLang(menu);
+  menu.hidden = false;
+
+  menu.addEventListener("click", async (e) => {
+    const action = e.target.closest("button")?.dataset.action;
+    if (!action) return;
+    await emit("menu-action", { action, id });
+    invoke("close_menu");
+  });
+  // Losing focus is the usual way a context menu disappears.
+  window.addEventListener("blur", () => invoke("close_menu"));
+}
+
 /* ---------- Startup ---------- */
 
 async function init() {
@@ -297,6 +476,12 @@ async function init() {
   }
   applyLanguage();
   applyTheme();
+
+  if (panelKind === "menu") {
+    document.body.classList.add("menu-mode");
+    renderMenu();
+    return;
+  }
 
   if (panelKind) {
     document.body.classList.add("panel-mode");
@@ -328,10 +513,23 @@ if (!panelKind) {
     if (tab) await selectTab(tab);
   });
 
+  listen("menu-action", async (e) => {
+    const { action, id } = e.payload;
+    const tab = tabs.find((item) => item.id === id);
+    if (!tab) return;
+    if (action === "beside") await openBeside(tab);
+    if (action === "pin") await toggleNeverUnload(tab);
+    if (action === "remove") await removeTab(tab);
+    if (action === "reload") {
+      await invoke("close_tab", { id: tab.id });
+      await applyLayout();
+    }
+  });
+
   listen("reset-tab", async () => {
     const tab = tabs.find((t) => t.id === activeId);
     if (!tab) return;
-    await invoke("remove_tab", { id: tab.id });
+    await invoke("close_tab", { id: tab.id });
     await selectTab(tab, true);
   });
 

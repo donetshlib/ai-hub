@@ -9,6 +9,7 @@ const SIDEBAR_WIDTH: u32 = 56;
 /// from rendering nor from the click-hit area.
 const OFFSCREEN: PhysicalPosition<i32> = PhysicalPosition::new(-10000, -10000);
 const PANEL_LABEL: &str = "__panel";
+const MENU_LABEL: &str = "__menu";
 /// Settings panel width in logical pixels.
 const PANEL_WIDTH: f64 = 380.0;
 const UNLOAD_CHECK_INTERVAL: Duration = Duration::from_secs(5);
@@ -155,17 +156,6 @@ fn save_settings(app: tauri::AppHandle, settings: Settings) {
     *app.state::<AppState>().settings.lock().unwrap() = settings;
 }
 
-/// Content area: the window minus the sidebar strip on the left.
-fn content_bounds(window: &tauri::Window) -> (PhysicalPosition<i32>, PhysicalSize<u32>) {
-    let size = window.inner_size().unwrap_or(PhysicalSize::new(1000, 700));
-    let scale = window.scale_factor().unwrap_or(1.0);
-    let sidebar_px = (SIDEBAR_WIDTH as f64 * scale) as i32;
-    (
-        PhysicalPosition::new(sidebar_px, 0),
-        PhysicalSize::new(size.width.saturating_sub(sidebar_px as u32), size.height),
-    )
-}
-
 /// The settings panel is a separate undecorated owner window on top of the main one, not
 /// part of the HTML: on Windows a tab's child webview is its own HWND and always sits above
 /// any HTML of the main window, so otherwise the panel would have to move or shrink the tab.
@@ -200,6 +190,45 @@ fn open_panel(app: tauri::AppHandle, webview: tauri::Webview, kind: String) -> R
     builder.build().map_err(|e| e.to_string())?;
     sync_panel(&app, &parent);
     Ok(())
+}
+
+/// Sidebar context menu. Also a separate owner window, and for the same reason as the
+/// settings panel: HTML of the main window would end up under the tab webviews.
+#[tauri::command(async)]
+fn open_menu(app: tauri::AppHandle, webview: tauri::Webview, id: String, x: f64, y: f64) -> Result<(), String> {
+    if let Some(menu) = app.get_webview_window(MENU_LABEL) {
+        menu.close().ok();
+    }
+    let parent = webview.window();
+    let scale = parent.scale_factor().unwrap_or(1.0);
+
+    #[allow(unused_mut)]
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        MENU_LABEL,
+        WebviewUrl::App(format!("index.html?panel=menu&tab={id}").into()),
+    )
+    .decorations(false)
+    .skip_taskbar(true)
+    .resizable(false)
+    .always_on_top(true)
+    .inner_size(230.0, 150.0)
+    .position(x / scale, y / scale);
+
+    #[cfg(windows)]
+    if let Ok(hwnd) = parent.hwnd() {
+        builder = builder.owner_raw(hwnd);
+    }
+
+    builder.build().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command(async)]
+fn close_menu(app: tauri::AppHandle) {
+    if let Some(menu) = app.get_webview_window(MENU_LABEL) {
+        menu.close().ok();
+    }
 }
 
 #[tauri::command(async)]
@@ -284,60 +313,94 @@ fn active_url(app: tauri::AppHandle) -> Option<String> {
     wv.and_then(|wv| wv.url().ok()).map(|u| u.to_string())
 }
 
+/// One pane of the split view: which tab to show and where, in logical pixels.
+#[derive(Debug, Deserialize)]
+struct Pane {
+    id: String,
+    url: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
 // async: otherwise the command runs on the main thread and add_child / native calls stall
 // the event loop (WebView2 needs a free message pump).
+//
+// The whole layout is computed in the frontend: it is the side that knows the sidebar width,
+// the pane headers and the dividers. Rust only applies the rectangles, creates missing
+// webviews and parks the ones that are not on screen.
 #[tauri::command(async)]
-fn switch_tab(app: tauri::AppHandle, webview: tauri::Webview, id: String, url: String) -> Result<(), String> {
+fn sync_panes(app: tauri::AppHandle, webview: tauri::Webview, panes: Vec<Pane>) -> Result<(), String> {
     // The argument is Webview, not WebviewWindow: after the first add_child the window holds
     // several webviews and Tauri refuses to resolve a WebviewWindow
     // ("current webview is not a WebviewWindow"), which broke every command at once.
     let window = webview.window();
     save_session(&app, &window);
     let state = app.state::<AppState>();
+    let scale = window.scale_factor().unwrap_or(1.0);
 
-    let existing_wv = state.webviews.lock().unwrap().get(&id).cloned();
-    if let Some(wv) = existing_wv {
-        let (position, size) = content_bounds(&window);
-        wv.set_position(position).ok();
-        wv.set_size(size).ok();
-        wv.set_focus().ok();
-    } else {
-        // Do not hold the webviews lock during add_child: creating a child webview can
-        // synchronously trigger a window resize event on the same thread, and
-        // resize_active_webview takes the same lock — holding it here deadlocks the thread
-        // against itself and freezes the whole window.
-        let (position, size) = content_bounds(&window);
-        let parsed_url = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
-        let wv = window
-            .add_child(
-                tauri::webview::WebviewBuilder::new(&id, WebviewUrl::External(parsed_url)),
-                position,
-                size,
-            )
-            .inspect_err(|e| eprintln!("[switch_tab] add_child FAILED: {e}"))
-            .map_err(|e| e.to_string())?;
-        state.webviews.lock().unwrap().insert(id.clone(), wv);
+    let mut shown: Vec<String> = Vec::with_capacity(panes.len());
+    for pane in &panes {
+        let position = PhysicalPosition::new((pane.x * scale) as i32, (pane.y * scale) as i32);
+        let size = PhysicalSize::new((pane.width * scale) as u32, (pane.height * scale) as u32);
+
+        let existing = state.webviews.lock().unwrap().get(&pane.id).cloned();
+        if let Some(wv) = existing {
+            wv.set_position(position).ok();
+            wv.set_size(size).ok();
+        } else {
+            // Do not hold the webviews lock during add_child: creating a child webview can
+            // synchronously trigger a window resize event on the same thread, and a resize
+            // handler taking the same lock would deadlock the thread against itself.
+            let url = tauri::Url::parse(&pane.url).map_err(|e| e.to_string())?;
+            let wv = window
+                .add_child(
+                    tauri::webview::WebviewBuilder::new(&pane.id, WebviewUrl::External(url)),
+                    position,
+                    size,
+                )
+                .map_err(|e| e.to_string())?;
+            state.webviews.lock().unwrap().insert(pane.id.clone(), wv);
+        }
+        shown.push(pane.id.clone());
     }
 
-    // Hide the previous tab only now that the new one is on screen: in the opposite order
-    // the empty window flashes underneath for a frame or two.
-    if let Some(prev) = state.active_tab.lock().unwrap().clone() {
-        if prev != id {
-            let prev_wv = state.webviews.lock().unwrap().get(&prev).cloned();
-            if let Some(wv) = prev_wv {
-                wv.set_position(OFFSCREEN).ok();
-            }
-            state.hidden_since.lock().unwrap().insert(prev, Instant::now());
+    // Everything not on screen is parked off-screen and starts its unload countdown. Parking
+    // happens after the visible panes are placed, otherwise an empty window flashes underneath.
+    let parked: Vec<(String, Webview)> = state
+        .webviews
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(id, _)| !shown.contains(id))
+        .map(|(id, wv)| (id.clone(), wv.clone()))
+        .collect();
+    {
+        let mut hidden_since = state.hidden_since.lock().unwrap();
+        for (id, wv) in parked {
+            wv.set_position(OFFSCREEN).ok();
+            hidden_since.entry(id).or_insert_with(Instant::now);
+        }
+        for id in &shown {
+            hidden_since.remove(id);
         }
     }
 
-    state.hidden_since.lock().unwrap().remove(&id);
-    *state.active_tab.lock().unwrap() = Some(id);
+    *state.active_tab.lock().unwrap() = shown.first().cloned();
+    if let Some(first) = shown.first() {
+        let wv = state.webviews.lock().unwrap().get(first).cloned();
+        if let Some(wv) = wv {
+            wv.set_focus().ok();
+        }
+    }
     Ok(())
 }
 
+/// Destroys a tab's webview right away: used by the pane close button and by tab removal,
+/// where waiting for the unload timeout makes no sense.
 #[tauri::command(async)]
-fn remove_tab(app: tauri::AppHandle, id: String) {
+fn close_tab(app: tauri::AppHandle, id: String) {
     let state = app.state::<AppState>();
     if let Some(wv) = state.webviews.lock().unwrap().remove(&id) {
         wv.close().ok();
@@ -346,17 +409,6 @@ fn remove_tab(app: tauri::AppHandle, id: String) {
     let mut active = state.active_tab.lock().unwrap();
     if active.as_deref() == Some(id.as_str()) {
         *active = None;
-    }
-}
-
-fn resize_active_webview(app: &tauri::AppHandle, window: &tauri::Window) {
-    let state = app.state::<AppState>();
-    let active = state.active_tab.lock().unwrap().clone();
-    let wv = active.and_then(|id| state.webviews.lock().unwrap().get(&id).cloned());
-    if let Some(wv) = wv {
-        let (position, size) = content_bounds(window);
-        wv.set_position(position).ok();
-        wv.set_size(size).ok();
     }
 }
 
@@ -452,11 +504,13 @@ pub fn run() {
             save_tabs,
             read_settings,
             save_settings,
-            switch_tab,
-            remove_tab,
+            sync_panes,
+            close_tab,
             active_url,
             open_panel,
             close_panel,
+            open_menu,
+            close_menu,
             set_webview_theme,
             clear_browsing_data
         ])
@@ -468,16 +522,14 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if window.label() == PANEL_LABEL {
+            if window.label() != "main" {
                 return;
             }
             let app = window.app_handle().clone();
             match event {
                 tauri::WindowEvent::CloseRequested { .. } => save_session(&app, window),
-                tauri::WindowEvent::Resized(_) => {
-                    resize_active_webview(&app, window);
-                    sync_panel(&app, window);
-                }
+                // Pane geometry is recomputed by the frontend on its own resize event.
+                tauri::WindowEvent::Resized(_) => sync_panel(&app, window),
                 tauri::WindowEvent::Moved(_) => sync_panel(&app, window),
                 _ => {}
             }
