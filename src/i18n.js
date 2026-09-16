@@ -1,4 +1,4 @@
-// Названия языков намеренно на самих языках — так их узнают без перевода.
+// Language names are deliberately written in their own language, so they need no translation.
 export const LANGS = {
   ru: "Русский",
   uk: "Українська",
@@ -246,7 +246,7 @@ export function t(key) {
   return STRINGS[current][key] ?? STRINGS.ru[key] ?? key;
 }
 
-/// Проставляет тексты и тултипы по data-i18n / data-i18n-title.
+// Fills texts, tooltips and placeholders from data-i18n / data-i18n-title / data-i18n-placeholder.
 export function applyLang(root = document) {
   for (const el of root.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
   for (const el of root.querySelectorAll("[data-i18n-title]")) el.title = t(el.dataset.i18nTitle);

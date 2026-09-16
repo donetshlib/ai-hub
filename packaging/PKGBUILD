@@ -1,15 +1,15 @@
 # Maintainer: AI Hub
 #
-# Установка: распакуй архив проекта, затем
+# Install: unpack the project archive, then
 #   cd packaging && makepkg -si
-# makepkg сам доставит недостающие зависимости через pacman.
+# makepkg pulls any missing dependencies through pacman itself.
 #
-# npm/Node тут не нужны: фронтенд это готовые статические файлы в src/,
-# бинарь собирается обычным cargo.
+# npm/Node are not needed here: the frontend is plain static files in src/,
+# the binary is built by plain cargo.
 pkgname=ai-hub
 pkgver=0.1.0
 pkgrel=1
-pkgdesc="Мульти-SSB с сайдбаром для ИИ-чатов (Claude, ChatGPT, Gemini, Grok, DeepSeek)"
+pkgdesc="Multi-SSB with a sidebar for AI chats (Claude, ChatGPT, Gemini, Grok, DeepSeek)"
 arch=('x86_64')
 url="https://github.com/local/ai-hub"
 license=('MIT')
@@ -18,10 +18,10 @@ makedepends=('rust' 'pkgconf')
 options=('!lto')
 
 prepare() {
-  # Собираем из дерева рядом с PKGBUILD, без промежуточного архива.
+  # Build from the tree next to PKGBUILD, without an intermediate archive.
   rm -rf "$srcdir/$pkgname"
   mkdir -p "$srcdir/$pkgname"
-  # packaging сюда не копируем: $srcdir лежит внутри него, вышла бы рекурсия.
+  # Do not copy packaging itself: $srcdir lives inside it, which would recurse.
   cp -r "$startdir/../src" "$startdir/../src-tauri" "$srcdir/$pkgname/"
   rm -rf "$srcdir/$pkgname/src-tauri/target"
 }

@@ -15,7 +15,7 @@
   --shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
 }
 
-/* "Оригинальная" — палитра иконки приложения: неон-зелёный по тёмно-синему. */
+/* "Original" theme: the app icon palette, neon green on deep blue. */
 html[data-theme="original"] {
   --bg: #10162a;
   --sidebar: #0a0f20;
@@ -63,7 +63,7 @@ html, body {
   background: var(--bg);
 }
 
-/* ---------- Сайдбар ---------- */
+/* ---------- Sidebar ---------- */
 
 #sidebar {
   position: fixed;
@@ -91,7 +91,7 @@ html, body {
   scrollbar-width: thin;
 }
 
-/* Скроллбары под тему приложения */
+/* Scrollbars follow the app theme */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -160,7 +160,7 @@ html, body {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-/* Полоска слева у активной вкладки: рамку на пёстрых фавиконах видно плохо. */
+/* Bar on the left of the active tab: the border alone is hard to see on colourful favicons. */
 .tab-icon.active::before {
   content: "";
   position: absolute;
@@ -206,9 +206,9 @@ html, body {
   background: var(--surface-hover);
 }
 
-/* ---------- Боковая панель ---------- */
+/* ---------- Side panel ---------- */
 
-/* В окне панели сайдбара нет, панель занимает окно целиком. */
+/* The panel window has no sidebar: the panel fills the whole window. */
 .panel-mode #sidebar {
   display: none;
 }
@@ -292,7 +292,7 @@ html, body {
   color: var(--text-dim);
 }
 
-/* Список вкладок: 4 строки, дальше скролл */
+/* Tab list: 4 rows, then it scrolls */
 #tab-rows {
   display: flex;
   flex-direction: column;
@@ -404,7 +404,7 @@ input:focus {
   color: var(--text-dim);
 }
 
-/* Тумблер */
+/* Toggle switch */
 .switch-row {
   display: flex;
   align-items: center;
@@ -450,7 +450,7 @@ input:focus {
   background: #fff;
 }
 
-/* Сегментированный переключатель */
+/* Segmented control */
 .segmented {
   display: flex;
   flex-wrap: wrap;
@@ -521,7 +521,7 @@ select:focus {
   border-color: var(--accent);
 }
 
-/* Пресеты */
+/* Presets */
 #presets {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

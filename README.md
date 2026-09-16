@@ -1,69 +1,70 @@
 # AI Hub
 
-Мульти-SSB с сайдбаром для чатов ИИ: Claude, ChatGPT, Gemini, Grok, DeepSeek, Perplexity и любые
-свои сервисы. Каждая вкладка живёт в своём webview, переключение мгновенное и без потери состояния —
-открытый чат, введённый текст и идущая генерация не сбрасываются.
+A multi-SSB with a sidebar for AI chats: Claude, ChatGPT, Gemini, Grok, DeepSeek, Perplexity and any
+service you add yourself. Every tab lives in its own webview, so switching is instant and loses no
+state — the open chat, the text you typed and a running generation all survive.
 
-Tauri 2 (Rust) + vanilla JS без бандлера. На Windows использует системный WebView2, на Linux — WebKitGTK.
+Tauri 2 (Rust) + vanilla JS, no bundler. Uses the system WebView2 on Windows and WebKitGTK on Linux.
 
-## Возможности
+## Features
 
-- Сайдбар с иконками сервисов, список хранится в `tabs.json`
-- Добавление вкладки из пресетов или по своему URL, иконки тянутся через favicon
-- Авто-выгрузка неактивных вкладок по настраиваемому таймауту, ручное закрепление правым кликом
-- Восстановление последней вкладки и её URL при запуске
-- Три темы (тёмная, светлая, «оригинальная»), тема прокидывается и в сами сайты
-- Интерфейс на 7 языках: русский, украинский, белорусский, английский, польский, немецкий, литовский
+- Sidebar of service icons; the list is stored in `tabs.json`
+- Add a tab from presets or by your own URL, icons are fetched as favicons
+- Auto-unload of inactive tabs after a configurable timeout, manual pinning with a right click
+- Restores the last tab and its URL on startup
+- Three themes (dark, light, "original"); the theme is passed down to the sites themselves
+- UI in 7 languages: Russian, Ukrainian, Belarusian, English, Polish, German, Lithuanian
 
-## Разработка
+## Development
 
-Нужны Rust (stable) и Node 18+. Фронтенд не собирается — это статические файлы в `src/`.
+Requires Rust (stable) and Node 18+. The frontend is not built — it is plain static files in `src/`.
 
 ```
 npm install
 npm run tauri dev
 ```
 
-## Сборка установщиков
+## Building installers
 
 ### Windows (NSIS)
 ```
 npm run tauri build
 ```
-Готовый установщик — `src-tauri/target/release/bundle/nsis/AI Hub_0.1.0_x64-setup.exe`.
+The installer lands in `src-tauri/target/release/bundle/nsis/AI Hub_0.1.0_x64-setup.exe`.
 
-Установщик спрашивает язык (русский, украинский, английский, польский, немецкий), режим установки
-(для всех пользователей или только для текущего), папку установки, создаёт ярлыки в меню «Пуск»
-и на рабочем столе. Требует установленного NSIS — Tauri CLI подтягивает его сам при первой сборке.
+It asks for the language (Russian, Ukrainian, English, Polish, German) and the install mode (all
+users or the current user only), lets you pick the install directory, and creates Start menu and
+desktop shortcuts. NSIS itself is downloaded by the Tauri CLI on the first build.
 
 ### Arch Linux
 
-Другу нужен один архив. Собери его в корне проекта:
+Pack the tree on the machine you develop on:
 
 ```
 tar czf ai-hub.tar.gz --exclude=node_modules --exclude=target --exclude=.git src src-tauri packaging
 ```
 
-Дальше у него два шага:
+Then, on the target machine, two steps are enough:
 
 ```
 tar xzf ai-hub.tar.gz
 cd packaging && makepkg -si
 ```
 
-`makepkg -si` сам доставит недостающие зависимости через pacman (`webkit2gtk-4.1`, `gtk3`, `rust`),
-соберёт и установит пакет: бинарь `/usr/bin/ai-hub`, ярлык в меню приложений, иконки в `hicolor`.
-Удаление обычное — `sudo pacman -R ai-hub`.
+`makepkg -si` pulls the missing dependencies through pacman (`webkit2gtk-4.1`, `gtk3`, `rust`),
+builds the package and installs it: the binary at `/usr/bin/ai-hub`, a launcher in the application
+menu and icons in `hicolor`. Uninstall the usual way — `sudo pacman -R ai-hub`.
 
-Node и npm на его стороне не нужны: фронтенд это готовые статические файлы, бинарь собирает cargo.
+Node and npm are not needed there: the frontend is plain static files and cargo builds the binary.
 
-Альтернатива без пакета — AppImage: `npm run tauri build -- --bundles appimage` (собирать нужно на
-Linux), файл появится в `src-tauri/target/release/bundle/appimage/`.
+An AppImage is the alternative if you would rather not build a package:
+`npm run tauri build -- --bundles appimage` (must be built on Linux), the file appears in
+`src-tauri/target/release/bundle/appimage/`.
 
-## Известные ограничения
+## Known limitations
 
-- Wayland: дочерние webview позиционируются только через X11, поэтому приложение принудительно
-  запускается под XWayland (`GDK_BACKEND=x11`).
-- Пауза авто-выгрузки во время генерации ответа не реализована: приложение не видит сетевую
-  активность внутри чужой страницы. Используй закрепление вкладки.
-- Split-view (несколько вкладок одновременно) пока не сделан.
+- Wayland: child webviews can only be positioned through X11, so the app forces XWayland
+  (`GDK_BACKEND=x11`).
+- Auto-unload is not paused while a response is streaming: the app cannot see network activity
+  inside someone else's page. Pin the tab instead.
+- Split view (several tabs side by side) is not implemented yet.

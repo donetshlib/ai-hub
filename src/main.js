@@ -3,7 +3,7 @@ import { LANGS, setLang, t, applyLang } from "./i18n.js";
 const { invoke } = window.__TAURI__.core;
 const { emit, listen } = window.__TAURI__.event;
 
-// Панель настроек рендерится этим же файлом, но в отдельном окне (?panel=settings|add).
+// The settings panel is rendered by this same file, but in a separate window (?panel=settings|add).
 const panelKind = new URLSearchParams(location.search).get("panel");
 
 const PRESETS = [
@@ -37,9 +37,9 @@ let openView = null;
 
 const favicon = (url) => `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`;
 
-/* ---------- Сайдбар ---------- */
+/* ---------- Sidebar ---------- */
 
-// Иконка приложения — последний рубеж, когда ни локальный файл, ни favicon не открылись.
+// The app icon is the last resort when neither a local file nor the favicon loads.
 const FALLBACK_ICON = "/assets/icon.png";
 
 function iconContent(tab) {
@@ -82,7 +82,7 @@ async function toggleNeverUnload(tab) {
   await emit("tabs-changed");
 }
 
-/* ---------- Боковая панель ---------- */
+/* ---------- Side panel ---------- */
 
 async function renderPanel() {
   openView = panelKind;
@@ -153,13 +153,13 @@ async function removeTab(tab) {
   await emit("tabs-changed");
 }
 
-/* ---------- Настройки ---------- */
+/* ---------- Settings ---------- */
 
 function markSegment(seg, value) {
   for (const btn of seg.children) btn.classList.toggle("on", btn.dataset.value === String(value));
 }
 
-// Своё значение показываем в минутах, если оно кратно минуте.
+// Show a custom value in minutes when it is a whole number of minutes.
 function renderTimeout() {
   const secs = settings.unload_timeout_secs;
   markSegment(timeoutSeg, secs ?? "never");
@@ -174,7 +174,7 @@ function renderTimeout() {
 
 function applyTheme() {
   document.documentElement.dataset.theme = settings.theme;
-  // Тема самих сайтов во вкладках (prefers-color-scheme внутри WebView2).
+  // Theme of the sites inside the tabs (prefers-color-scheme within WebView2).
   if (!panelKind) invoke("set_webview_theme", { theme: settings.theme });
 }
 
@@ -250,7 +250,7 @@ document.getElementById("add-tab-btn").addEventListener("click", () =>
 document.getElementById("settings-btn").addEventListener("click", () =>
   invoke("open_panel", { kind: "settings" })
 );
-// Контекстное меню WebView2 в собственном UI не нужно: перезагружать тут нечего.
+// The WebView2 context menu is useless in our own UI: there is nothing to reload here.
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 document.addEventListener("keydown", (e) => {
@@ -267,7 +267,7 @@ viewAdd.addEventListener("submit", (e) => {
   viewAdd.reset();
 });
 
-/* ---------- Старт ---------- */
+/* ---------- Startup ---------- */
 
 async function init() {
   [tabs, settings] = await Promise.all([invoke("read_tabs"), invoke("read_settings")]);
@@ -289,7 +289,7 @@ async function init() {
   if (first) await selectTab(first);
 }
 
-// Панель живёт в своём окне и правит те же файлы — синхронизируем состояние.
+// The panel lives in its own window and edits the same files, so keep the state in sync.
 if (!panelKind) {
   listen("tabs-changed", async () => {
     tabs = await invoke("read_tabs");

@@ -1,7 +1,7 @@
-# Секреты и локальное окружение
+# Secrets and local environment
 .env
 
-# Зависимости и артефакты сборки
+# Dependencies and build artifacts
 node_modules/
 target/
 dist/
@@ -10,7 +10,7 @@ dist/
 packaging/src/
 packaging/pkg/
 
-# Инструменты разработки, не нужные для сборки
+# Dev tooling not needed to build the app
 .claude/
 .deepseek-agent/
 .devcontainer/
@@ -20,7 +20,7 @@ TZ-*.md
 .aider*
 .env.example
 
-# Прочее
+# Misc
 *.log
 .DS_Store
 .vscode/*

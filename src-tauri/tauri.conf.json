@@ -32,8 +32,8 @@
     "category": "Productivity",
     "publisher": "AI Hub",
     "copyright": "AI Hub",
-    "shortDescription": "Мульти-SSB для ИИ-чатов",
-    "longDescription": "Сайдбар с иконками ИИ-сервисов: Claude, ChatGPT, Gemini, Grok, DeepSeek и любые свои. Каждый сервис в своём webview, переключение мгновенное и без потери состояния.",
+    "shortDescription": "Multi-SSB for AI chats",
+    "longDescription": "A sidebar of AI service icons: Claude, ChatGPT, Gemini, Grok, DeepSeek and any of your own. Every service runs in its own webview, switching is instant and keeps the state.",
     "windows": {
       "nsis": {
         "installMode": "both",

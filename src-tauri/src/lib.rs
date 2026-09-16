@@ -5,11 +5,11 @@ use std::time::{Duration, Instant};
 use tauri::{Manager, PhysicalPosition, PhysicalSize, Webview, WebviewUrl};
 
 const SIDEBAR_WIDTH: u32 = 56;
-/// Неактивные webview паркуются здесь: hide() на Windows не убирает дочерний HWND
-/// ни из отрисовки, ни из зоны перехвата кликов.
+/// Inactive webviews are parked here: on Windows hide() removes the child HWND neither
+/// from rendering nor from the click-hit area.
 const OFFSCREEN: PhysicalPosition<i32> = PhysicalPosition::new(-10000, -10000);
 const PANEL_LABEL: &str = "__panel";
-/// Ширина панели настроек в логических пикселях.
+/// Settings panel width in logical pixels.
 const PANEL_WIDTH: f64 = 380.0;
 const UNLOAD_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -21,19 +21,19 @@ struct Tab {
     icon: String,
     #[serde(default)]
     never_unload: bool,
-    /// Последний URL внутри сервиса, для восстановления сессии.
+    /// Last URL inside the service, used to restore the session.
     #[serde(default)]
     last_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Settings {
-    /// None = "никогда не выгружать". В секундах, произвольное значение задаётся в настройках.
+    /// None = "never unload". Seconds; an arbitrary value can be set in the settings.
     #[serde(default = "default_unload")]
     unload_timeout_secs: Option<u64>,
     #[serde(default = "default_theme")]
     theme: String,
-    /// Открывать при старте ту же вкладку и тот же URL, что были при выходе.
+    /// Open the same tab and URL that were active on exit.
     #[serde(default)]
     restore_session: bool,
     #[serde(default)]
@@ -69,7 +69,7 @@ impl Default for Settings {
 struct AppState {
     webviews: Mutex<HashMap<String, Webview>>,
     active_tab: Mutex<Option<String>>,
-    /// Момент, когда вкладка стала неактивной (скрыта). Используется для отсчёта таймаута.
+    /// When the tab became inactive (hidden). Drives the unload timeout.
     hidden_since: Mutex<HashMap<String, Instant>>,
     settings: Mutex<Settings>,
 }
@@ -114,8 +114,8 @@ fn read_tabs(app: tauri::AppHandle) -> Vec<Tab> {
 #[tauri::command]
 fn save_tabs(app: tauri::AppHandle, mut tabs: Vec<Tab>) {
     let path = tabs_path(&app);
-    // Фронтенд держит свою копию списка и не знает про last_url, который пишет
-    // save_session. Без переноса с диска любое сохранение из UI его бы стирало.
+    // The frontend keeps its own copy of the list and knows nothing about last_url, which
+    // save_session writes. Without carrying it over from disk, any UI save would wipe it.
     if let Ok(data) = std::fs::read_to_string(&path) {
         if let Ok(old) = serde_json::from_str::<Vec<Tab>>(&data) {
             for tab in tabs.iter_mut().filter(|t| t.last_url.is_none()) {
@@ -148,7 +148,7 @@ fn save_settings(app: tauri::AppHandle, settings: Settings) {
     *app.state::<AppState>().settings.lock().unwrap() = settings;
 }
 
-/// Область контента: окно минус полоса сайдбара слева.
+/// Content area: the window minus the sidebar strip on the left.
 fn content_bounds(window: &tauri::Window) -> (PhysicalPosition<i32>, PhysicalSize<u32>) {
     let size = window.inner_size().unwrap_or(PhysicalSize::new(1000, 700));
     let scale = window.scale_factor().unwrap_or(1.0);
@@ -159,12 +159,12 @@ fn content_bounds(window: &tauri::Window) -> (PhysicalPosition<i32>, PhysicalSiz
     )
 }
 
-/// Панель настроек это отдельное безрамочное окно-владелец поверх главного, а не часть
-/// HTML: дочерний webview вкладки на Windows свой HWND и всегда выше любого HTML главного
-/// окна, поэтому иначе панель пришлось бы двигать/сжимать саму вкладку.
+/// The settings panel is a separate undecorated owner window on top of the main one, not
+/// part of the HTML: on Windows a tab's child webview is its own HWND and always sits above
+/// any HTML of the main window, so otherwise the panel would have to move or shrink the tab.
 #[tauri::command(async)]
 fn open_panel(app: tauri::AppHandle, webview: tauri::Webview, kind: String) -> Result<(), String> {
-    // Повторный клик по той же кнопке закрывает панель, по другой — переключает вид.
+    // Clicking the same button again closes the panel; a different one switches the view.
     if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
         let same = panel.url().is_ok_and(|u| u.query() == Some(&format!("panel={kind}")));
         panel.close().ok();
@@ -202,7 +202,7 @@ fn close_panel(app: tauri::AppHandle) {
     }
 }
 
-/// Окно панели не связано с главным физически — двигаем и растягиваем его сами.
+/// The panel window is not physically tied to the main one, so we move and resize it ourselves.
 fn sync_panel(app: &tauri::AppHandle, parent: &tauri::Window) {
     let Some(panel) = app.get_webview_window(PANEL_LABEL) else { return };
     let Some(scale) = parent.scale_factor().ok() else { return };
@@ -216,7 +216,7 @@ fn sync_panel(app: &tauri::AppHandle, parent: &tauri::Window) {
     panel.set_size(tauri::LogicalSize::new(PANEL_WIDTH, size.height)).ok();
 }
 
-/// Тема самих сайтов внутри вкладок: WebView2 отдаёт её странице как prefers-color-scheme.
+/// Theme of the sites inside the tabs: WebView2 passes it to the page as prefers-color-scheme.
 #[tauri::command(async)]
 fn set_webview_theme(webview: tauri::Webview, theme: String) {
     let theme = match theme.as_str() {
@@ -226,8 +226,8 @@ fn set_webview_theme(webview: tauri::Webview, theme: String) {
     webview.window().set_theme(Some(theme)).ok();
 }
 
-/// Пишет URL активной вкладки в tabs.json, а её id в settings.json.
-/// Вызывается при уходе с вкладки и при закрытии окна.
+/// Writes the active tab's URL into tabs.json and its id into settings.json.
+/// Called when leaving a tab and when the window closes.
 fn save_session(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
     let Some(id) = state.active_tab.lock().unwrap().clone() else { return };
@@ -244,8 +244,8 @@ fn save_session(app: &tauri::AppHandle) {
     save_settings(app.clone(), Settings { last_active: Some(id), ..settings });
 }
 
-/// URL, на котором сейчас реально находится активная вкладка (после навигации внутри
-/// сервиса), чтобы открыть то же самое в обычном браузере.
+/// The URL the active tab is actually on right now (after navigating inside the service),
+/// so the same page can be opened in a regular browser.
 #[tauri::command(async)]
 fn active_url(app: tauri::AppHandle) -> Option<String> {
     let state = app.state::<AppState>();
@@ -254,13 +254,13 @@ fn active_url(app: tauri::AppHandle) -> Option<String> {
     wv.and_then(|wv| wv.url().ok()).map(|u| u.to_string())
 }
 
-// async: иначе команда исполняется на главном потоке и add_child/нативные вызовы
-// подвешивают event loop (WebView2 нужен свободный message pump).
+// async: otherwise the command runs on the main thread and add_child / native calls stall
+// the event loop (WebView2 needs a free message pump).
 #[tauri::command(async)]
 fn switch_tab(app: tauri::AppHandle, webview: tauri::Webview, id: String, url: String) -> Result<(), String> {
-    // Аргумент именно Webview, а не WebviewWindow: после первого add_child окно держит
-    // несколько webview, и Tauri отказывается резолвить WebviewWindow
-    // ("current webview is not a WebviewWindow") — ломались все команды разом.
+    // The argument is Webview, not WebviewWindow: after the first add_child the window holds
+    // several webviews and Tauri refuses to resolve a WebviewWindow
+    // ("current webview is not a WebviewWindow"), which broke every command at once.
     let window = webview.window();
     save_session(&app);
     let state = app.state::<AppState>();
@@ -272,10 +272,10 @@ fn switch_tab(app: tauri::AppHandle, webview: tauri::Webview, id: String, url: S
         wv.set_size(size).ok();
         wv.set_focus().ok();
     } else {
-        // Не держим лок на webviews во время add_child: создание нового дочернего
-        // webview может синхронно триггернуть событие ресайза окна на этом же потоке,
-        // а resize_active_webview тоже пытается взять этот лок — без освобождения
-        // здесь это самоблокировка (поток вешает сам себя, включая всё окно).
+        // Do not hold the webviews lock during add_child: creating a child webview can
+        // synchronously trigger a window resize event on the same thread, and
+        // resize_active_webview takes the same lock — holding it here deadlocks the thread
+        // against itself and freezes the whole window.
         let (position, size) = content_bounds(&window);
         let parsed_url = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
         let wv = window
@@ -289,8 +289,8 @@ fn switch_tab(app: tauri::AppHandle, webview: tauri::Webview, id: String, url: S
         state.webviews.lock().unwrap().insert(id.clone(), wv);
     }
 
-    // Прячем предыдущую вкладку только теперь, когда новая уже на экране: при обратном
-    // порядке на кадр-два видно пустое окно под ней.
+    // Hide the previous tab only now that the new one is on screen: in the opposite order
+    // the empty window flashes underneath for a frame or two.
     if let Some(prev) = state.active_tab.lock().unwrap().clone() {
         if prev != id {
             let prev_wv = state.webviews.lock().unwrap().get(&prev).cloned();
@@ -330,11 +330,10 @@ fn resize_active_webview(app: &tauri::AppHandle, window: &tauri::Window) {
     }
 }
 
-/// Периодически выгружает (уничтожает) webview вкладок, неактивных дольше таймаута.
-/// ВАЖНО: не отслеживает "идёт ли генерация ответа" внутри вкладки — Tauri не видит
-/// сетевую активность конкретного сайта изнутри webview без встраивания JS-хуков
-/// под каждый сервис отдельно. В v1 это не реализовано — исключение только через
-/// ручной оверрайд never_unload.
+/// Periodically unloads (destroys) webviews of tabs inactive longer than the timeout.
+/// NOTE: it does not track whether a response is still streaming inside a tab — Tauri cannot
+/// see a site's network activity from outside the webview without injecting per-service JS
+/// hooks. Not implemented in v1; the only exception is the manual never_unload override.
 fn spawn_unload_watcher(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -379,9 +378,9 @@ fn spawn_unload_watcher(app: tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Дочерние webview на Linux двигаются только через X11 (см. wry: set_bounds под
-    // cfg(feature = "x11")). На Wayland позиционирование окон запрещено протоколом,
-    // поэтому вкладка и панель разъезжаются — форсируем XWayland.
+    // Child webviews on Linux are only moved through X11 (see wry: set_bounds under
+    // cfg(feature = "x11")). Wayland forbids window positioning by the protocol, so the tab
+    // and the panel drift apart — force XWayland.
     #[cfg(target_os = "linux")]
     std::env::set_var("GDK_BACKEND", "x11");
 
