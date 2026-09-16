@@ -40,6 +40,11 @@ struct Settings {
     last_active: Option<String>,
     #[serde(default = "default_lang")]
     lang: String,
+    /// Window geometry from the previous run: logical x, y, width, height.
+    #[serde(default)]
+    window: Option<[f64; 4]>,
+    #[serde(default)]
+    maximized: bool,
 }
 
 fn default_lang() -> String {
@@ -62,6 +67,8 @@ impl Default for Settings {
             restore_session: false,
             last_active: None,
             lang: default_lang(),
+            window: None,
+            maximized: false,
         }
     }
 }
@@ -228,8 +235,9 @@ fn set_webview_theme(webview: tauri::Webview, theme: String) {
 
 /// Writes the active tab's URL into tabs.json and its id into settings.json.
 /// Called when leaving a tab and when the window closes.
-fn save_session(app: &tauri::AppHandle) {
+fn save_session(app: &tauri::AppHandle, window: &tauri::Window) {
     let state = app.state::<AppState>();
+    save_window_state(app, window);
     let Some(id) = state.active_tab.lock().unwrap().clone() else { return };
     let wv = state.webviews.lock().unwrap().get(&id).cloned();
     let Some(url) = wv.and_then(|wv| wv.url().ok()).map(|u| u.to_string()) else { return };
@@ -242,6 +250,28 @@ fn save_session(app: &tauri::AppHandle) {
 
     let settings = state.settings.lock().unwrap().clone();
     save_settings(app.clone(), Settings { last_active: Some(id), ..settings });
+}
+
+/// Remembers where and how big the window was, so the next run opens the same way.
+fn save_window_state(app: &tauri::AppHandle, window: &tauri::Window) {
+    let maximized = window.is_maximized().unwrap_or(false);
+    let settings = {
+        let state = app.state::<AppState>();
+        let mut settings = state.settings.lock().unwrap().clone();
+        settings.maximized = maximized;
+        // A maximized window would save the maximized size, so the restored size is kept as is.
+        if !maximized {
+            if let (Ok(scale), Ok(position), Ok(size)) =
+                (window.scale_factor(), window.outer_position(), window.inner_size())
+            {
+                let position = position.to_logical::<f64>(scale);
+                let size = size.to_logical::<f64>(scale);
+                settings.window = Some([position.x, position.y, size.width, size.height]);
+            }
+        }
+        settings
+    };
+    save_settings(app.clone(), settings);
 }
 
 /// The URL the active tab is actually on right now (after navigating inside the service),
@@ -262,7 +292,7 @@ fn switch_tab(app: tauri::AppHandle, webview: tauri::Webview, id: String, url: S
     // several webviews and Tauri refuses to resolve a WebviewWindow
     // ("current webview is not a WebviewWindow"), which broke every command at once.
     let window = webview.window();
-    save_session(&app);
+    save_session(&app, &window);
     let state = app.state::<AppState>();
 
     let existing_wv = state.webviews.lock().unwrap().get(&id).cloned();
@@ -376,6 +406,31 @@ fn spawn_unload_watcher(app: tauri::AppHandle) {
     });
 }
 
+fn restore_window_state(app: &tauri::AppHandle) {
+    let settings = app.state::<AppState>().settings.lock().unwrap().clone();
+    let Some(window) = app.get_webview_window("main") else { return };
+    if let Some([x, y, width, height]) = settings.window {
+        window.set_size(tauri::LogicalSize::new(width, height)).ok();
+        window.set_position(tauri::LogicalPosition::new(x, y)).ok();
+    }
+    if settings.maximized {
+        window.maximize().ok();
+    }
+}
+
+/// Wipes cookies and storage of every tab: a quick way to sign out of all accounts.
+/// The data is shared by the whole app profile, so one call covers every service.
+#[tauri::command(async)]
+fn clear_browsing_data(app: tauri::AppHandle, webview: tauri::Webview) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    for (_, wv) in state.webviews.lock().unwrap().drain() {
+        wv.close().ok();
+    }
+    state.hidden_since.lock().unwrap().clear();
+    *state.active_tab.lock().unwrap() = None;
+    webview.clear_all_browsing_data().map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Child webviews on Linux are only moved through X11 (see wry: set_bounds under
@@ -402,11 +457,13 @@ pub fn run() {
             active_url,
             open_panel,
             close_panel,
-            set_webview_theme
+            set_webview_theme,
+            clear_browsing_data
         ])
         .setup(|app| {
             let handle = app.handle().clone();
             *handle.state::<AppState>().settings.lock().unwrap() = read_settings(handle.clone());
+            restore_window_state(&handle);
             spawn_unload_watcher(handle);
             Ok(())
         })
@@ -416,7 +473,7 @@ pub fn run() {
             }
             let app = window.app_handle().clone();
             match event {
-                tauri::WindowEvent::CloseRequested { .. } => save_session(&app),
+                tauri::WindowEvent::CloseRequested { .. } => save_session(&app, window),
                 tauri::WindowEvent::Resized(_) => {
                     resize_active_webview(&app, window);
                     sync_panel(&app, window);

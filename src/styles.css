@@ -521,6 +521,29 @@ select:focus {
   border-color: var(--accent);
 }
 
+.danger {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--danger);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.danger:hover {
+  border-color: var(--danger);
+}
+
+.danger.armed {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+
 /* Presets */
 #presets {
   display: grid;

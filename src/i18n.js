@@ -11,6 +11,10 @@ export const LANGS = {
 
 const STRINGS = {
   ru: {
+    accounts: "Аккаунты",
+    signOutAll: "Выйти из всех аккаунтов",
+    signOutConfirm: "Нажми ещё раз для подтверждения",
+    signOutHint: "Удаляет cookie и данные сайтов во всех вкладках. Отменить нельзя.",
     settings: "Настройки",
     newTab: "Новая вкладка",
     tabs: "Вкладки",
@@ -43,6 +47,10 @@ const STRINGS = {
     noTab: "вкладка не открыта",
   },
   uk: {
+    accounts: "Акаунти",
+    signOutAll: "Вийти з усіх акаунтів",
+    signOutConfirm: "Натисни ще раз для підтвердження",
+    signOutHint: "Видаляє cookie та дані сайтів у всіх вкладках. Скасувати не можна.",
     settings: "Налаштування",
     newTab: "Нова вкладка",
     tabs: "Вкладки",
@@ -75,6 +83,10 @@ const STRINGS = {
     noTab: "вкладку не відкрито",
   },
   be: {
+    accounts: "Уліковыя запісы",
+    signOutAll: "Выйсці з усіх уліковых запісаў",
+    signOutConfirm: "Націсні яшчэ раз для пацвярджэння",
+    signOutHint: "Выдаляе cookie і дадзеныя сайтаў ва ўсіх укладках. Адмяніць нельга.",
     settings: "Налады",
     newTab: "Новая ўкладка",
     tabs: "Укладкі",
@@ -107,6 +119,10 @@ const STRINGS = {
     noTab: "укладка не адкрыта",
   },
   en: {
+    accounts: "Accounts",
+    signOutAll: "Sign out of all accounts",
+    signOutConfirm: "Click again to confirm",
+    signOutHint: "Deletes cookies and site data in every tab. This cannot be undone.",
     settings: "Settings",
     newTab: "New tab",
     tabs: "Tabs",
@@ -139,6 +155,10 @@ const STRINGS = {
     noTab: "no tab open",
   },
   pl: {
+    accounts: "Konta",
+    signOutAll: "Wyloguj ze wszystkich kont",
+    signOutConfirm: "Kliknij ponownie, aby potwierdzić",
+    signOutHint: "Usuwa pliki cookie i dane stron we wszystkich kartach. Nie można tego cofnąć.",
     settings: "Ustawienia",
     newTab: "Nowa karta",
     tabs: "Karty",
@@ -171,6 +191,10 @@ const STRINGS = {
     noTab: "brak otwartej karty",
   },
   de: {
+    accounts: "Konten",
+    signOutAll: "Von allen Konten abmelden",
+    signOutConfirm: "Zum Bestätigen erneut klicken",
+    signOutHint: "Löscht Cookies und Website-Daten in allen Tabs. Das lässt sich nicht rückgängig machen.",
     settings: "Einstellungen",
     newTab: "Neuer Tab",
     tabs: "Tabs",
@@ -203,6 +227,10 @@ const STRINGS = {
     noTab: "kein Tab geöffnet",
   },
   lt: {
+    accounts: "Paskyros",
+    signOutAll: "Atsijungti nuo visų paskyrų",
+    signOutConfirm: "Spustelėkite dar kartą, kad patvirtintumėte",
+    signOutHint: "Ištrina slapukus ir svetainių duomenis visose kortelėse. To atšaukti negalima.",
     settings: "Nustatymai",
     newTab: "Nauja kortelė",
     tabs: "Kortelės",

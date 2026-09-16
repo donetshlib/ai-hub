@@ -242,6 +242,27 @@ document.getElementById("reset-url").addEventListener("click", async () => {
   closePanel();
 });
 
+// Two-step button: the first click only arms it, so accounts are never dropped by a stray click.
+let clearArmed = false;
+document.getElementById("clear-data").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (!clearArmed) {
+    clearArmed = true;
+    btn.textContent = t("signOutConfirm");
+    btn.classList.add("armed");
+    setTimeout(() => {
+      clearArmed = false;
+      btn.textContent = t("signOutAll");
+      btn.classList.remove("armed");
+    }, 4000);
+    return;
+  }
+  await invoke("clear_browsing_data");
+  // The tab webviews are gone now, so the main window reopens the active one from scratch.
+  await emit("reset-tab");
+  closePanel();
+});
+
 document.getElementById("cancel-add").addEventListener("click", closePanel);
 document.getElementById("close-btn").addEventListener("click", closePanel);
 document.getElementById("add-tab-btn").addEventListener("click", () =>
